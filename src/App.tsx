@@ -19,19 +19,29 @@ function downloadText(conteudo: string, nome: string, tipo: string) {
 }
 
 function parseItemRow(row: string[]): [string, number] {
-  if (row.length >= 3) {
-    const qtd = parseFloat((row[2] ?? '').replace(/\./g, '').replace(',', '.')) || 0
-    return [row[1] ?? '', qtd]
+  if (row.length === 0) return ['', 0]
+
+  // Detecta automaticamente código de embalagem (8-13 dígitos) e quantidade (número pequeno)
+  let codemb = ''
+  let qtd = 0
+
+  for (const cell of row) {
+    const t = cell.trim()
+    if (!codemb && /^\d{8,13}$/.test(t)) {
+      codemb = t
+    } else if (qtd === 0) {
+      const n = parseFloat(t.replace(/\./g, '').replace(',', '.'))
+      if (!isNaN(n) && n > 0 && n < 100_000) qtd = n
+    }
   }
-  if (row.length === 2) {
-    const qtd = parseFloat((row[1] ?? '').replace(/\./g, '').replace(',', '.')) || 0
-    return [row[0] ?? '', qtd]
+
+  // Fallback: primeira célula = código, última = quantidade
+  if (!codemb) {
+    codemb = row[0] ?? ''
+    const last = row[row.length - 1] ?? ''
+    qtd = qtd || parseFloat(last.replace(/\./g, '').replace(',', '.')) || 0
   }
-  const str = row[0]?.trim() ?? ''
-  const barcodeMatch = str.match(/\b(\d{8,13})\b/)
-  const numMatch = str.match(/\b(\d+(?:[,.]\d+)?)\s*$/)
-  const codemb = barcodeMatch?.[1] ?? str.split(/\s+/)[0] ?? str
-  const qtd = numMatch ? parseFloat(numMatch[1].replace(',', '.')) || 0 : 0
+
   return [codemb, qtd]
 }
 

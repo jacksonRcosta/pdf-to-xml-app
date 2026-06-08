@@ -1,13 +1,14 @@
 import type { CnpjInfo, CpfInfo, DadosExtraidos, TabelaExtraida } from '../types'
 
 export function extrairCnpj(texto: string): CnpjInfo[] {
-  const padrao = /\b(\d{2}[\.\s]?\d{3}[\.\s]?\d{3}[/\s]?\d{4}[-\s]?\d{2})\b/g
+  // Aceita separadores com espaços ao redor: "10.840.716 / 0001 - 00" também é reconhecido
+  const padrao = /(\d{2})\s*\.?\s*(\d{3})\s*\.?\s*(\d{3})\s*\/?\s*(\d{4})\s*-?\s*(\d{2})/g
   const encontrados = [...texto.matchAll(padrao)]
   const vistos = new Set<string>()
   const resultado: CnpjInfo[] = []
 
   for (const match of encontrados) {
-    const n = match[1].replace(/\D/g, '')
+    const n = `${match[1]}${match[2]}${match[3]}${match[4]}${match[5]}`
     if (n.length === 14 && !vistos.has(n)) {
       vistos.add(n)
       const formatado = `${n.slice(0, 2)}.${n.slice(2, 5)}.${n.slice(5, 8)}/${n.slice(8, 12)}-${n.slice(12, 14)}`
@@ -39,11 +40,11 @@ export function extrairCpf(texto: string): CpfInfo[] {
 const PADROES_CAMPOS: Record<string, RegExp> = {
   chave_nfe: /\b(\d{44})\b/,
   inscricao_est: /(?:insc(?:ri[çc][aã]o)?\s*est(?:adual)?\s*[:\-]?\s*)([\w\d.\-/]+)/i,
-  data_emissao: /(?:data\s*emiss[aã]o|emitido\s*em)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i,
+  data_emissao: /(?:data\s*(?:de\s*)?emiss[aã]o|emitido\s*em|data)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i,
   valor_total: /valor\s*total\s*[:\-R$]*\s*([\d.]+,\d{2})/i,
-  razao_social: /raz[aã]o\s*social\s*[:\-]?\s*(.+?)(?:\n|CNPJ|CPF|$)/i,
-  nome_fantasia: /nome\s*(?:fantasia)?\s*[:\-]?\s*(.+?)(?:\n|CNPJ|$)/i,
-  natureza_operacao: /natureza\s*(?:da\s*)?opera[çc][aã]o\s*[:\-]?\s*(.+?)(?:\n|$)/i,
+  razao_social: /raz[aã]o\s*social\s*[:\-]?\s*(.+?)(?:\n|\t|CNPJ|CPF|$)/i,
+  nome_fantasia: /nome\s*(?:fantasia)?\s*[:\-]?\s*(.+?)(?:\n|\t|CNPJ|$)/i,
+  natureza_operacao: /natureza\s*(?:da\s*)?opera[çc][aã]o\s*[:\-]?\s*(.+?)(?:\n|\t|$)/i,
   email: /[\w.\-+]+@[\w\-]+\.[a-z]{2,}(?:\.[a-z]{2})?/i,
   telefone: /(?:\+55\s?)?(?:\(?\d{2}\)?\s?)(?:9\s?)?\d{4}[\s\-]?\d{4}/,
   cep: /\b\d{5}[\-\s]?\d{3}\b/,
@@ -70,12 +71,16 @@ export function montarDadosExtraidos(
   const cpfs = extrairCpf(texto_completo)
   const campos_extras = extrairCamposRegex(texto_completo)
 
-  // Tenta detectar linhas tabulares simples (linhas com múltiplos campos separados por espaços)
+  // Extrai tabelas usando \n para linhas e \t para colunas (formato do novo pdfExtractor)
   const tabelas: TabelaExtraida[] = paginas
     .map(({ pagina, texto }) => {
-      const linhas = texto.split(/\s{3,}|\t/).filter((l) => l.trim().length > 2)
+      const linhas = texto
+        .split('\n')
+        .map((l) => l.split('\t').map((s) => s.trim()).filter(Boolean))
+        .filter((cols) => cols.length > 0 && cols.join('').length > 2)
+
       if (linhas.length >= 3) {
-        return { pagina, dados: linhas.map((l) => [l.trim()]) }
+        return { pagina, dados: linhas }
       }
       return null
     })
