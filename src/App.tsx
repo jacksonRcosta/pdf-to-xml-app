@@ -75,7 +75,7 @@ export default function App() {
   const parsedRows = itensDados.map(parseItemRow)
   const totalSkus = parsedRows.filter(([cod]) => cod.length > 0).length
   const totalUnidades = parsedRows.reduce((acc, [, qtd]) => acc + qtd, 0)
-  const cnpjPrincipal = dados?.cnpjs[0]
+  const cnpjPrincipal = tabela?.cnpj ?? dados?.cnpjs[0]
   const dataEmissao = dados?.campos_extras?.data_emissao ?? ''
   const razaoSocial = dados?.campos_extras?.razao_social ?? ''
   const nomeBase = `resultado_${layoutId}`

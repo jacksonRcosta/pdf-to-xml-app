@@ -13,6 +13,7 @@ export interface TabelaExtraida {
   dados: string[][]       // todas as linhas brutas da página
   itens: string[][]       // somente linhas com código de barras (produto)
   numeroPedido?: string   // extraído do texto da página
+  cnpj?: CnpjInfo         // CNPJ do cliente nesta página
 }
 
 export interface DadosExtraidos {

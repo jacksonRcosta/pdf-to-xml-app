@@ -114,8 +114,10 @@ export function montarDadosExtraidos(
         .filter((cols) => cols.length > 0 && cols.join('').length > 2)
 
       const numeroPedido = extrairNumeroPedido(texto)
+      const cnpjsPagina = extrairCnpj(texto)
+      const cnpj = cnpjsPagina[0]
 
-      return { pagina, dados, itens, numeroPedido: numeroPedido || undefined }
+      return { pagina, dados, itens, numeroPedido: numeroPedido || undefined, cnpj }
     })
     .filter((t): t is NonNullable<typeof t> => t !== null) as TabelaExtraida[]
 
