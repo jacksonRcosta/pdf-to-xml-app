@@ -1,9 +1,6 @@
 import type { LayoutId, LayoutInfo } from '../types'
 
 const LAYOUTS: LayoutInfo[] = [
-  { id: 'nfe',          nome: 'NF-e',            descricao: 'Nota Fiscal Eletrônica / DANFe', icone: '🧾' },
-  { id: 'cadastro',     nome: 'Cadastro PJ',      descricao: 'Pessoa Jurídica — contratos e fichas', icone: '🏢' },
-  { id: 'protheus',     nome: 'TOTVS Protheus',   descricao: 'Importação ERP Protheus / TOTVS', icone: '⚙️' },
   { id: 'importacao',   nome: 'Importação ION',   descricao: 'Layout ArquivoImportado (13 colunas)', icone: '📦' },
   { id: 'personalizado', nome: 'Personalizado',    descricao: 'Esqueleto genérico adaptável', icone: '🔧' },
 ]
