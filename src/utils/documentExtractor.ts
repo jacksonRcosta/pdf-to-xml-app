@@ -1,7 +1,7 @@
 import type { CnpjInfo, CpfInfo, DadosExtraidos, TabelaExtraida } from '../types'
 
 export function extrairCnpj(texto: string): CnpjInfo[] {
-  // Aceita separadores com espaços ao redor: "10.840.716 / 0001 - 00" também é reconhecido
+  // Aceita separadores com espaços ao redor
   const padrao = /(\d{2})\s*\.?\s*(\d{3})\s*\.?\s*(\d{3})\s*\/?\s*(\d{4})\s*-?\s*(\d{2})/g
   const encontrados = [...texto.matchAll(padrao)]
   const vistos = new Set<string>()
@@ -41,6 +41,7 @@ const PADROES_CAMPOS: Record<string, RegExp> = {
   chave_nfe: /\b(\d{44})\b/,
   inscricao_est: /(?:insc(?:ri[çc][aã]o)?\s*est(?:adual)?\s*[:\-]?\s*)([\w\d.\-/]+)/i,
   data_emissao: /(?:data\s*(?:de\s*)?emiss[aã]o|emitido\s*em|data)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i,
+  data_compra: /data\s*compra\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i,
   valor_total: /valor\s*total\s*[:\-R$]*\s*([\d.]+,\d{2})/i,
   razao_social: /raz[aã]o\s*social\s*[:\-]?\s*(.+?)(?:\n|\t|CNPJ|CPF|$)/i,
   nome_fantasia: /nome\s*(?:fantasia)?\s*[:\-]?\s*(.+?)(?:\n|\t|CNPJ|$)/i,
@@ -52,15 +53,29 @@ const PADROES_CAMPOS: Record<string, RegExp> = {
 
 export function extrairCamposRegex(texto: string): Record<string, string> {
   const campos: Record<string, string> = {}
-
   for (const [nome, padrao] of Object.entries(PADROES_CAMPOS)) {
     const match = padrao.exec(texto)
     if (match) {
       campos[nome] = (match[1] ?? match[0]).trim().slice(0, 200)
     }
   }
-
   return campos
+}
+
+// Extrai o número do pedido da linha de texto de uma página
+function extrairNumeroPedido(texto: string): string {
+  const match =
+    texto.match(/N[ºO°]?\.?\s*PEDIDO\s*[:\s]+(\d{4,8})/i) ||
+    texto.match(/PEDIDO[:\s#]+(\d{4,8})/i) ||
+    texto.match(/PED[:\s#]+(\d{4,8})/i)
+  return match?.[1] ?? ''
+}
+
+// Retorna somente linhas que contêm um código de barras (8-13 dígitos isolados)
+function filtrarItensProduto(linhas: string[][]): string[][] {
+  return linhas.filter((row) =>
+    row.some((cell) => /^\d{8,13}$/.test(cell.trim())),
+  )
 }
 
 export function montarDadosExtraidos(
@@ -71,7 +86,6 @@ export function montarDadosExtraidos(
   const cpfs = extrairCpf(texto_completo)
   const campos_extras = extrairCamposRegex(texto_completo)
 
-  // Extrai tabelas usando \n para linhas e \t para colunas (formato do novo pdfExtractor)
   const tabelas: TabelaExtraida[] = paginas
     .map(({ pagina, texto }) => {
       const linhas = texto
@@ -79,12 +93,16 @@ export function montarDadosExtraidos(
         .map((l) => l.split('\t').map((s) => s.trim()).filter(Boolean))
         .filter((cols) => cols.length > 0 && cols.join('').length > 2)
 
-      if (linhas.length >= 3) {
-        return { pagina, dados: linhas }
-      }
-      return null
+      if (linhas.length < 2) return null
+
+      const itens = filtrarItensProduto(linhas)
+      if (itens.length === 0) return null
+
+      const numeroPedido = extrairNumeroPedido(texto)
+
+      return { pagina, dados: linhas, itens, numeroPedido: numeroPedido || undefined }
     })
-    .filter((t): t is TabelaExtraida => t !== null)
+    .filter((t): t is NonNullable<typeof t> => t !== null) as TabelaExtraida[]
 
   return { cnpjs, cpfs, campos_extras, tabelas, texto_completo }
 }

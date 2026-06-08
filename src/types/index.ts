@@ -10,7 +10,9 @@ export interface CpfInfo {
 
 export interface TabelaExtraida {
   pagina: number
-  dados: string[][]
+  dados: string[][]       // todas as linhas brutas da página
+  itens: string[][]       // somente linhas com código de barras (produto)
+  numeroPedido?: string   // extraído do texto da página
 }
 
 export interface DadosExtraidos {

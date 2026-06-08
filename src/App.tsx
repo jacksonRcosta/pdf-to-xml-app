@@ -20,28 +20,16 @@ function downloadText(conteudo: string, nome: string, tipo: string) {
 
 function parseItemRow(row: string[]): [string, number] {
   if (row.length === 0) return ['', 0]
-
-  // Detecta automaticamente código de embalagem (8-13 dígitos) e quantidade (número pequeno)
   let codemb = ''
   let qtd = 0
-
   for (const cell of row) {
     const t = cell.trim()
-    if (!codemb && /^\d{8,13}$/.test(t)) {
-      codemb = t
-    } else if (qtd === 0) {
+    if (!codemb && /^\d{8,13}$/.test(t)) codemb = t
+    else if (qtd === 0) {
       const n = parseFloat(t.replace(/\./g, '').replace(',', '.'))
-      if (!isNaN(n) && n > 0 && n < 100_000) qtd = n
+      if (!isNaN(n) && n > 0 && n < 1_000_000) qtd = n
     }
   }
-
-  // Fallback: primeira célula = código, última = quantidade
-  if (!codemb) {
-    codemb = row[0] ?? ''
-    const last = row[row.length - 1] ?? ''
-    qtd = qtd || parseFloat(last.replace(/\./g, '').replace(',', '.')) || 0
-  }
-
   return [codemb, qtd]
 }
 
@@ -83,7 +71,7 @@ export default function App() {
   })
 
   const tabela = dados?.tabelas[tabelaIdx]
-  const itensDados = tabela ? tabela.dados.slice(1) : []
+  const itensDados = tabela?.itens ?? []
   const parsedRows = itensDados.map(parseItemRow)
   const totalSkus = parsedRows.filter(([cod]) => cod.length > 0).length
   const totalUnidades = parsedRows.reduce((acc, [, qtd]) => acc + qtd, 0)
@@ -181,7 +169,9 @@ export default function App() {
                 <p className="text-blue-100 text-xs font-semibold uppercase tracking-wider mb-2">SKUs</p>
                 <p className="text-5xl font-bold">{totalSkus}</p>
                 {tabela && (
-                  <p className="text-blue-100 text-xs mt-3">Página {tabela.pagina}</p>
+                  <p className="text-blue-100 text-xs mt-3">
+                    {tabela.numeroPedido ? `Pedido #${tabela.numeroPedido}` : `Página ${tabela.pagina}`}
+                  </p>
                 )}
               </div>
 
@@ -216,7 +206,7 @@ export default function App() {
                         ? 'bg-brand-600 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                   >
-                    Pág. {t.pagina}
+                    {t.numeroPedido ? `#${t.numeroPedido}` : `Pág. ${t.pagina}`}
                   </button>
                 ))}
               </div>
