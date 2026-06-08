@@ -1,7 +1,6 @@
 import type { CnpjInfo, CpfInfo, DadosExtraidos, TabelaExtraida } from '../types'
 
 export function extrairCnpj(texto: string): CnpjInfo[] {
-  // Aceita separadores com espaços ao redor
   const padrao = /(\d{2})\s*\.?\s*(\d{3})\s*\.?\s*(\d{3})\s*\/?\s*(\d{4})\s*-?\s*(\d{2})/g
   const encontrados = [...texto.matchAll(padrao)]
   const vistos = new Set<string>()
@@ -62,20 +61,36 @@ export function extrairCamposRegex(texto: string): Record<string, string> {
   return campos
 }
 
-// Extrai o número do pedido da linha de texto de uma página
 function extrairNumeroPedido(texto: string): string {
-  const match =
+  const m =
     texto.match(/N[ºO°]?\.?\s*PEDIDO\s*[:\s]+(\d{4,8})/i) ||
-    texto.match(/PEDIDO[:\s#]+(\d{4,8})/i) ||
-    texto.match(/PED[:\s#]+(\d{4,8})/i)
-  return match?.[1] ?? ''
+    texto.match(/PEDIDO[:\s#]+(\d{4,8})/i)
+  return m?.[1] ?? ''
 }
 
-// Retorna somente linhas que contêm um código de barras (8-13 dígitos isolados)
-function filtrarItensProduto(linhas: string[][]): string[][] {
-  return linhas.filter((row) =>
-    row.some((cell) => /^\d{8,13}$/.test(cell.trim())),
-  )
+/**
+ * Extrai itens de produto pelo padrão estrutural do PDF VR SOFTWARE:
+ * barcode EAN-13  →  (descrição opcional)  →  EMB (XX/N)  →  cód. externo  →  quantidade
+ *
+ * O padrão (?:[^\/\n]|\/(?!\d))* permite "/" na descrição (ex: "C/ACUCAR")
+ * mas pára antes de EMB com "/" seguido de dígito (ex: "UN/12").
+ * Funciona mesmo quando o barcode está colado ao texto (ex: "PROM7506339325249").
+ */
+function extrairItensDaPagina(texto: string): string[][] {
+  const itens: string[][] = []
+
+  for (const linha of texto.split('\n')) {
+    const l = linha.replace(/\t/g, ' ')
+
+    const m = l.match(
+      /(\d{13})(?!\d)(?:[^/\n]|\/(?!\d))*[A-Za-z]{1,4}\/\d+\s+\d{6,15}\s+(\d{1,6})(?=\s|$)/,
+    )
+    if (m) {
+      itens.push([m[1], m[2]])
+    }
+  }
+
+  return itens
 }
 
 export function montarDadosExtraidos(
@@ -88,19 +103,19 @@ export function montarDadosExtraidos(
 
   const tabelas: TabelaExtraida[] = paginas
     .map(({ pagina, texto }) => {
-      const linhas = texto
+      // Itens filtrados por regex (apenas linhas de produto com barcode)
+      const itens = extrairItensDaPagina(texto)
+      if (itens.length === 0) return null
+
+      // Linhas brutas mantidas para referência (layout personalizado)
+      const dados = texto
         .split('\n')
         .map((l) => l.split('\t').map((s) => s.trim()).filter(Boolean))
         .filter((cols) => cols.length > 0 && cols.join('').length > 2)
 
-      if (linhas.length < 2) return null
-
-      const itens = filtrarItensProduto(linhas)
-      if (itens.length === 0) return null
-
       const numeroPedido = extrairNumeroPedido(texto)
 
-      return { pagina, dados: linhas, itens, numeroPedido: numeroPedido || undefined }
+      return { pagina, dados, itens, numeroPedido: numeroPedido || undefined }
     })
     .filter((t): t is NonNullable<typeof t> => t !== null) as TabelaExtraida[]
 
